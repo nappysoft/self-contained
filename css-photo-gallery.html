@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+  <meta charset="UTF-8" />
+  <title>Blank HTML5 Template</title>
+  <head>
+    <style id="main-style">
+      ul {
+        margin:0;
+        padding:0;
+        list-style: none;
+      }
+     
+       ul.polaroids li {
+        margin-left: 0.5em;
+        margin-right: 0.5em;
+        margin-top: 0.5em;
+        margin-bottom: 0.5em;
+        
+        float: left;
+        display: inline-block;
+      }
+      
+      ul.polaroids a {
+        display: inline-block;
+        overflow: hidden;
+        padding: 0.3em;
+      }
+      
+      ul.polaroids a:after {
+        content: attr(title);
+        display: block;
+      }
+      /* all photos are rotated initially */
+      ul.polaroids a {
+        -webkit-transform: rotate(-2deg);
+        position: relative;
+        
+      }
+      ul.polaroids li:nth-child(even) a {
+        -webkit-transform: rotate(2deg);
+      }
+      ul.polaroids li:nth-child(3n) a {
+        -webkit-transform: translate(0,-5px);
+      }
+      ul.polaroids li:nth-child(4n) a {
+        -webkit-transform: rotate(-3deg) translate(0,5px);
+      }
+      ul.polaroids li:nth-child(5n) a {
+        -webkit-transform: none;
+      }
+      /* on hover straighten them out and scale them up */
+      ul.polaroids li a:hover {
+        -webkit-transform: rotate(1deg) scale(1.1);
+        z-index: 5;
+      }
+
+      .pgallery {
+        margin: 2em; 
+      }
+      .pgallery > header > h1, .pgallery > header > h2 {
+        text-align: center; 
+      }
+      
+      .photo {
+        background-color: #ffffe0;
+      }
+      .photo  {
+        box-shadow: 1px 1px 5px rgba(0,0,0,0.3),
+                    inset 0 0 0 1px rgba(0,0,0,0.3);
+        text-decoration: none;
+        text-align: center;
+
+        font-family: Tahoma, Arial, sanserif;
+        font-size: 20px;
+        color: #000000;
+      }
+      .photo:hover {
+        color: #B8860B;
+      }
+      
+    </style>
+  </head>
+  <body id="main-body">
+    <main id="page">
+      <section id='pgallery' class="pgallery">
+        <header>
+          <h1>Photo Gallery</h1>
+          <h2>Gallery Title</h2>
+        </header>
+        <ul class='polaroids'>
+        
+        </ul>
+      </section>
+    </main>
+    <script id="main-script">      
+      var program = {};
+      
+      program.getFlickrFeed = function (url) {
+        var self,
+            wURL,
+            scrEl,
+            jsonText;
+        
+        wURL = new webkitURL(url);
+        scrEl = document.createElement('script');
+        scrEl.id = 'json-feed-data';
+        scrEl.type = 'text/javascript';
+        scrEl.src = wURL.href;
+          
+        document.body.appendChild(scrEl);
+      };
+      
+      program.gotFlickrFeed = function (app,jsonData) {
+        var self,
+            jsonText,
+            error;
+        
+        self = app;
+        error = false;
+        
+        if (!jsonData || !jsonData.generator || jsonData.generator !== 'http://www.flickr.com/') {
+          localStorage.setItem('program.errors.last',JSON.stringify({errno:99,msg:'feed.generator'}));
+          console.error('feed.generator: %s','incorrec');
+          return;
+        }
+        
+        try {
+            jsonText = JSON.stringify(jsonData);
+        } catch (e) {
+          error = true;
+          console.error('store.feed: %s',e.message);
+        }
+        
+        if (error) {
+          return;
+        }
+        // TODO: need to check the dated of the data.
+        localStorage.setItem('program.feeds.flikr.stored',true);
+        localStorage.setItem('program.feeds.flikr.json',jsonText);
+        
+        this.gallery.refresh();
+      };
+      
+      
+      program.gallery = (function (app) {
+        var self, // reference
+            application,
+            ls,   // localStorage
+            lsKey, // string
+            lsFeedPrefix,  //string
+            feedName,     //string
+            feedData;     //object
+        
+        var elements = {
+          gal:undefined,
+          list:undefined,
+          title:undefined
+        }
+        var templates = {
+          photo: '<li><a href="%link%" class="photo" title="%title%"><img src="%media%" alt="%title%" /></a><li>'
+        };
+        
+        function template (templateString,templateData,prefix,suffix) {
+         var t = templateString.substr();
+          for (var token in templateData) {
+            var reg = new RegExp((prefix||'')+token+(suffix||''),"gm");
+            t = t.replace(reg,templateData[token]);
+          }
+          return t;
+        }
+        
+        function getFeedData(name) {
+          var isFeedStored;
+          
+          isFeedStored = ls.getItem([lsFeedPrefix,name,'stored'].join('.'));
+          
+          if (!isFeedStored) {
+            return;
+          }
+          
+          try {
+            feedData = JSON.parse(ls.getItem([lsFeedPrefix,name,'json'].join('.')));
+          } catch (e) {
+            console.error('%s - error: %s',lsKey,e.message); 
+          }
+        }
+        
+        function refresh() {
+          var itemCount,
+              tData;
+          
+          getFeedData('flikr');
+          if (!feedData) {
+            console.error('%s - error: %s',lsKey,'could not load feed data'); 
+          }
+       
+          itemCount = feedData.items.length;
+          
+          if (itemCount <= 0) {
+            console.log('%s - refresh: %s',lsKey,'No items to load');
+            return;
+          }
+          
+          tData = {
+            title:'',
+            link:'',
+            media:''
+          };
+          feedData.items.forEach(function(item,index) {
+            var data,
+                html;
+            
+            html = "";
+            data = Object.create(tData);
+            data.link = item.link;
+            data.title = item.title;
+            data.media = item.media.m;
+            
+            html = template(templates.photo,data,'%','%');
+            
+            elements.list.insertAdjacentHTML('BeforeEnd',html);
+          });
+          
+        }
+        
+        self = this;
+        application = app;
+        ls = localStorage;
+        lsKey = 'gallery';
+        lsFeedPrefix = 'program.feeds';
+        feedName = 'flikr';
+        
+        elements.gal = document.getElementById('pgallery');
+        elements.list = elements.gal.getElementsByClassName('polaroids')[0];
+         
+        return {
+          refresh: refresh 
+        }
+      }(program));
+      
+      program.main = function (args) {
+        var self = this;
+        // I just picked a random feed.
+        //"http://api.flickr.com/services/feeds/photos_public.gne?format=json&id=52309254@N02"
+        //http://www.flickr.com/photos/justinegordon/
+        var fURL = "http://api.flickr.com/services/feeds/photos_public.gne?format=json&id=52309254@N02";
+        
+        this.getFlickrFeed(fURL);
+      };
+      
+      var jsonFlickrFeed = function (obj) {
+        program.gotFlickrFeed(program,obj);
+      };
+      var jsonFlickrScrElement = undefined;
+
+    </script>
+    <script id="main-script-loader">
+    
+      window.onload = function (e) {
+        program.main(); 
+      };
+      
+    </script>
+  </body>
+</html>
