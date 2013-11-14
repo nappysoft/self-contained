@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Blank HTML5 Template</title>
+    <style id="main-style">
+      html,
+      body,
+      ul,
+      ol {
+        margin: 0;
+        padding: 0;
+        border-width: 0; }
+
+      #main-menu li {
+        float:left;
+      }
+      #canvas-screen {
+        border: 1px solid black; 
+      }
+    </style>
+  </head>
+  <body id="main-body">
+    <main id="page" class="page">
+      <header>
+        <nav>
+          <ul id="main-menu">
+            <li><button id="button-run">Run</button></li>
+          </ul>
+        </nav>
+      </header>
+      
+      <div>
+        <canvas id="canvas-screen" width="500" height="400"></canvas>
+      </div>
+    </main>
+    <script id="main-script">
+      if (!program) {
+        var program = {}
+      }
+      
+      program.config = {
+        elements: {
+          main:"page",
+          canvas:"canvas-screen",
+          menu:"main-menu"
+        }
+      };
+      program.properties = {
+        elements: {
+          main:undefined,
+          canvas:undefined,
+          menu:undefined
+        }
+      };
+      
+      program.screens = {
+        bootScreen: function (screen) {
+          var width,
+              height,
+              ctx;
+          
+          ctx = screen.getBufferContext(0);
+          width = ctx.canvas.width;
+          height = ctx.canvas.height;
+          
+          ctx.save();
+          ctx.fillStyle = "#00aa00";
+          ctx.fillRect(0,0,width,height);
+          ctx.restore();
+          ctx.save();
+        }
+      };
+      
+      program.screen = {
+        conf: {},
+        props: {},
+        buffers: [],
+        createBuffer: function (count) {
+          count = count ? count > 0 ? count : 1 : 1;
+          var self,
+              index,
+              buff,
+              itr;
+          
+          self = this;
+          for (itr = 0; itr < count; itr += 1) {
+            index = this.buffers.push({});
+            buff = this.buffers[index-1];
+            
+            buff.canvas = document.createElement('canvas');
+            buff.canvas.width = self.props.canvas.width;
+            buff.canvas.height = self.props.canvas.height;
+            buff.ctx = buff.canvas.getContext("2d");
+          }
+          return self.buffers;
+        },
+        getBufferContext: function (index) {
+          index = 0;
+          var ctx;
+          
+          if (this.buffers.length > 0) {
+              ctx = this.buffers[index].ctx;
+          };
+          
+          return ctx;
+        },
+        clearBuffer: function (index) {
+          var ctx;
+          ctx = this.getBufferContext(0);
+          ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+        },
+        writeBuffers: function (list,clearAfter) {
+          list = list || [0];
+          var self = this;
+          list.forEach(function (item,index) {
+              self.writeBuffer(item,clearAfter);
+          });
+        },
+        writeBuffer: function (index,clearAfter) {
+          index = index ? index : 0;
+          clearAfter = clearAfter || true;
+          var canvas,
+              buffCanvas,
+              ctx,
+              buffCount;
+          
+          canvas = this.props.canvas;
+          ctx = canvas.getContext("2d");
+          buffCount = this.buffers.length;
+          
+          if (buffCount > 0 && index < buffCount) {
+            buffCanvas = this.buffers[index].canvas;
+            ctx.drawImage(buffCanvas,0,0,
+                          buffCanvas.width,buffCanvas.height,
+                          0,0,
+                          canvas.width,canvas.height);
+            if(clearAfter) {
+              this.clearBuffer(index);
+            }
+          }
+        },
+        init: function (application) {
+          this.props.app = application;
+          this.props.canvas = application.properties.elements.canvas;
+          this.createBuffer(3);
+          this.clearBuffer(0);
+        }
+      };
+      program.graphics = {
+        conf:{},
+        props:{},
+        gObjectCounter: 0,
+        gObjects: [],
+        gObject: function (opts) {
+          opts = opts || {};
+          var index,
+              obj;
+          this.gObjectCounter += 1;
+          index = this.gObjects.push({parent: this, id:this.gObjectCounter});
+          obj = this.gObjects[index-1];
+          
+            obj.zIndex = 0;
+            obj.x = opts.x || 0;
+            obj.y = opts.y || 0;
+            obj.w = opts.w || 0;
+            obj.h = opts.h || 0;
+            obj.render = opts.render || function (ctx) {};
+         
+          return obj; 
+        },
+        gObjectLayer: function (name) {
+          var obj;
+          
+          obj = this.gObject({});  
+          
+          obj.items = [];
+          obj.name = name || "";
+          obj.visibility = true;
+          
+          obj.zIndexSort = function () {
+            this.items.sort(function(a,b) {
+              return (a.zIndex - b.zIndex);
+            });
+          };
+          
+          obj.render = function (ctx) {
+            var count,
+                itr;
+            
+            this.zIndexSort();
+            
+            count = this.items.length;
+            for (itr = 0;itr < count;itr += 1) {
+              this.items[itr].render(ctx); 
+            }
+          };
+          return obj;
+        },
+        gObjectCanvas: function (width,height,opts) {
+          opts = opts || {};
+          var obj;
+          
+          obj = this.gObject({});
+          
+          obj.name = opts.name || "";
+          obj.w = width || 1;
+          obj.h = height || width || 1;
+          obj.canvas = document.createElement('canvas');
+          obj.canvas.width = obj.w;
+          obj.canvas.height = obj.h;
+          
+          obj.autoScale = false;
+          
+          obj.getContext2d = function () {
+              return this.canvas.getContext("2d");
+          };
+          
+          obj.setDemensions = function (w,h) {
+            if (w && w > 0) {
+              this.w = w;
+              this.canvas.width = w;
+              if (!h) {
+                this.h = w;
+                this.canvas.height = w;
+              }
+            }
+            if (h && h > 0) {
+              this.h = h;
+              this.canvas.height = h;
+            }
+          };
+          
+          obj.render = function (ctx) {
+            ctx.save();
+            ctx.drawImage(this.canvas,this.x,this.y,
+                          this.canvas.width,this.canvas.height,
+                          this.x,this.y,
+                          this.autoScale ? ctx.canvas.width : this.canvas.width,
+                          this.autoScale ? ctx.canvas.height : this.canvas.height);
+            ctx.restore();
+          };
+          
+          return obj;
+        },
+        init: function (ref) {
+          this.props.app = ref;
+        }
+      };
+      program.textObject = function (textString,opts) {
+        opts = opts || {};
+        var obj = this.graphics.gObject(opts);
+        
+        obj.text = textString || "";
+        obj.font = opts.font || undefined;
+        obj.fillStyle  = opts.fillStyle || undefined;
+        obj.strokeStyle = opts.strokeStyle || undefined;
+        obj.lineWidth = opts.lineWidth || undefined;
+        
+        obj.render = function (ctx) {
+
+          ctx.save();
+          ctx.font = this.font || ctx.font;
+          if (this.strokeStyle) {
+            ctx.strokeStyle = this.strokeStyle;
+            ctx.lineWidth = this.lineWidth || ctx.lineWidth;
+            ctx.strokeText(this.text,this.x,this.y);
+          }
+          if (this.fillStyle) {
+            ctx.fillStyle = this.fillStyle;
+            ctx.fillText(this.text,this.x,this.y);
+          }
+          
+          ctx.restore();
+          
+        }
+        return obj;
+      };
+      program.main = function (args) {
+        var self,
+            conf,
+            props;
+        
+        self = this;
+        conf = self.config;
+        props = self.properties;
+        
+        if (typeof args === 'object') {
+          
+        }
+        
+        props.elements.main = document.getElementById(conf.elements.main);
+        props.elements.canvas = document.getElementById(conf.elements.canvas);
+        props.elements.menu = document.getElementById(conf.elements.menu);
+        
+        self.graphics.init(self);
+        self.screen.init(self);
+        
+        var layer = self.graphics.gObjectLayer("main-layer");
+        
+        layer.items.push(self.textObject("Testing",{x:10,y:50,
+                                                    lineWidth:1,
+                                                    font:"50px Tahoma, sans-serif",
+                                                    fillStyle:"#ee0000",strokeStyle:"#000000"}));
+        
+        var image = self.graphics.gObjectCanvas(200,200);
+        
+        
+        layer.render(image.getContext2d());
+        
+        image.render(self.screen.getBufferContext(0));
+        
+        self.screen.writeBuffer(0,true);
+        
+     };
+      
+    </script>
+    <script id="main-script-loader">
+    
+      window.onload = function (e) {
+        if (typeof program === 'object') {
+          program.main();
+        }
+      };
+      
+    </script>
+  </body>
+</html>
