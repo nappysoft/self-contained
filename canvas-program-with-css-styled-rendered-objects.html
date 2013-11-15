@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Blank HTML5 Template</title>
+    <style id="main-style">
+      html,
+      body,
+      ul,
+      ol {
+        margin: 0;
+        padding: 0;
+        border-width: 0; }
+      
+      
+    </style>
+    <style id='interface-classes'>
+      #main {
+        top:0px;
+        left:0px;
+        width:500px;
+        height:400px;
+        background-color: #eeeeee;
+      }
+      #header {
+        top: 2px;
+        left: 2px;
+        width: 496px;
+        height: 40px;
+        background-color: rgba(200,180,10,0.5);
+        border-color: #000000;
+        border-width: 0.5em;
+      }
+      #leftColumb {
+        top: 45px;
+        left: 2px;
+        width: 100px;
+        height: 356px;
+        background-color: #aaaaaa;
+        border-color: #000000;
+        border-width: 0.5em;
+      }
+    </style>
+  </head>
+  <body id="main-body">
+    <main id="page" class="page">
+      <header></header>
+      <nav>
+        <ul id="menu"></ul>
+      </nav>
+      <canvas id="main-canvas" width="500" height="400" style="border:1px solid black;"></canvas>
+    </main>
+    <div id="interface-objects" style="visibility:hidden;">
+     
+    </div>
+    <script id="main-script">
+      if (!program) {
+        var program = {}
+      }
+      
+      program.utils = {
+        events:{
+          addRemoveEventListenersToElement: function (mode,element,func,capture,many) {
+            // no error checking on the passed arguments.
+            var manyArray;
+
+            if (!mode || !element || !func || !capture || !many || many.length === 0) {
+              return;
+            }
+            
+
+            
+            if (typeof many === 'string') {
+              many = many.replace(/^[\s,]+|[\s,]+$/g, '');
+              if (/[,]/g.test(many) && many.length !== 0) {
+                manyArray = many.split(',');
+              }
+            } else if (typeof many.shift === 'function') {
+              manyArray = many;
+            } else {
+              return;
+            }
+
+            
+            manyArray.forEach(function(item) {
+              switch (mode) {
+                case 'add':
+                  element.addEventListener(item,func,false);
+                  break;
+                case 'remove':
+                  element.removeEventListener(item,func,false);
+                  break;
+                default:
+                  break;
+              }
+            });
+          }
+        },
+        getStyleSheetById: function (id) {
+         var styleSheet,
+             itr;
+          
+          for (itr = 0; itr < document.styleSheets.length; itr += 1) {
+
+            if (document.styleSheets[itr].ownerNode.id === id) {
+              styleSheet = document.styleSheets[itr];
+              break;
+            }
+          }
+
+          return styleSheet;
+        }
+      };
+      // I hope not to add any lag to Mouse handling.
+      // By introducing a Mouse object I hope to also 
+      // include a Keyboard object and a TouchScreen object
+      program.TMouse = {
+        conf:{
+          bufferSize: 25
+        },
+        props:{
+          buffLastIndex: 0,
+          buffer:[]
+        },
+        addEvent: function (e) {
+          var buff,
+              buffSize,
+              lastIndex,
+              itr;
+          
+          buff = this.props.buffer;
+          buffSize = this.conf.bufferSize;
+          
+          if (buff.length >= buffSize) {
+            buff.shift();
+          }
+          /*
+          itr = (buff.length - bufferSize);
+          
+          for (itr; itr > 0; itr -= 1) {
+            buff.shift();
+          }
+          */
+          
+          lastIndex = buff.push(e) - 1;
+          this.props.buffLastIndex = lastIndex;
+          return buff[lastIndex];
+        },
+        init: function(application,args) {
+          this.app = application; 
+        },
+        getLastEvent: function () {
+          return this.props.buff[this.props.bufferLastIndex];
+        }
+      };
+      
+      program.TCanvas = {
+        conf:{},
+        props:{
+          mouseIsDown: false,
+          lastX: 0,
+          lastY: 0
+        },
+        canvas:null,
+        mouseEvent: function (e) {
+          var self,
+              el,
+              evType,
+              evData,
+              callFunc;
+          
+          self = this.wrapper;
+          el = this;
+          evType = e.type;
+          callFunc = undefined;
+          
+          evData = self.app.Mouse.addEvent({
+                      type: e.type,
+                      x: e.clientX || e.pageX || e.x,
+                      y: e.clientY || e.pageY || e.x,
+                      which: e.which || 0,
+                      button: e.button || 0,
+                      keyCode: e.keyCode || 0,
+                      ctrlKey: e.ctrlKey || false,
+                      altKey: e.altKey || false,
+                      shiftKey: e.shiftKey || false
+                    }); 
+          
+          e.preventDefault();
+          // this could be made shorter by mappind the event names
+          // to the handler functions but I am not sure what that would
+          // to performance.
+          switch (evType) {
+            case 'mousedown':
+              console.log(e);
+              callFunc = self.mouseDown;
+              break;
+            case 'mouseup':
+              callFunc = self.mouseUp;
+              break;
+            case 'mouseleave':
+              callFunc = self.mouseLeave;
+            case 'mousemove':
+              if (self.props.isMouseDown) {
+                callFunc = self.mouseMove;
+              } else {
+                callFunc = self.mouseHover;
+              }
+            default:
+              callFunc = self.mouseUnhandled;
+              break;
+          }
+          if (callFunc) {
+            callFunc.call(self,evData);
+          }
+        },
+        mouseUnhandled: function(e) {},
+        
+        mouseDown: function (e) {
+          console.log(e);
+          this.props.mouseIsDown = true;
+        },
+        
+        mouseUp: function (e) {
+          this.props.mouseIdDown = false;
+        },
+        
+        mouseLeave: function (e) {
+          this.props.mouseIsDown = false;
+        },
+        
+        mouseMove: function (e) {
+          
+        },
+        
+        mouseHover: function (e) {
+          
+        },
+        
+        getCanvasContext: function () {
+          return this.canvas.getContext("2d");
+        },
+        clearContext: function (ctx) {
+         ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height); 
+        },
+        clearCanvas: function () {
+          this.clearContext(this.getCanvasContext());
+        },
+        attach: function (canvasElement) {
+          var self;
+          
+          self = this;
+          self.canvas = canvasElement;
+          self.canvas.app = self.app;
+          self.canvas.wrapper = self;
+          self.app.utils.events.addRemoveEventListenersToElement('add',
+                                                                 self.canvas,
+                                                                 self.mouseEvent,
+                                                                 true,
+                                                                 "mousedown,mouseup,mousemove,mouseenter,mouseleave");
+          
+        },
+        init: function (application,args) {
+         this.app = application; 
+        }
+      };
+      
+      program.TRenderer = {
+        conf:{
+          strokeFirst: true
+        },
+        props:{},
+        renderObject: function (ctx,sObj) {
+          
+          console.log('rendering',sObj);
+          ctx.save();
+            ctx.fillStyle = sObj.style.backgroundColor;
+            ctx.strokeStyle = sObj.style.borderColor;
+            ctx.lineWidth = sObj.style.borderWidth;
+          ctx.strokeRect(sObj.style.left,sObj.style.top,sObj.style.width,sObj.style.height);  
+          ctx.fillRect(sObj.style.left,sObj.style.top,sObj.style.width,sObj.style.height);
+            
+          ctx.restore();
+          console.log('finished rendering');
+        },
+        init: function (application,args) {
+         this.app = application; 
+        }
+      };
+      
+      program.elements = {
+        canvas:undefined
+      };
+      
+      program.main = function (args) {
+        var self;
+        
+        self = this;
+        
+        
+        if (typeof args === 'object') {
+          
+        }
+        
+        self.Mouse = Object.create(self.TMouse);
+        
+        self.elements.canvas = document.getElementById('main-canvas');
+        self.Canvas = Object.create(self.TCanvas);
+        self.Canvas.init(self);
+        self.Canvas.attach(self.elements.canvas);
+        
+        self.Renderer = Object.create(self.TRenderer);
+        self.Renderer.init(self);
+        
+        var styleSheet = self.utils.getStyleSheetById('interface-classes');
+        var styledObjects = [];
+        
+        for (var itr = 0; itr < styleSheet.cssRules.length; itr += 1) {
+          var rule,
+              style;
+          
+          rule = styleSheet.cssRules[itr];
+          style = rule.style;
+          
+          if (/^#/g.test(rule.selectorText)) {
+            styledObjects.push({
+              name: rule.selectorText.replace('#',''),
+              style: {
+                top: style.top.replace(/px|em\%/,'') || '0',
+                left: style.left.replace(/px|em\%/,'') || '0',
+                width: style.width.replace(/px|em\%/,'') || '0',
+                height: style.height.replace(/px|em\%/,'') || '0',
+                borderWidth: style.borderWidth.replace(/px|em\%/,'') || '0',
+                color: style.color || '',
+                font: style.font || '',
+                backgroundColor: style.backgroundColor || '',
+                borderColor: style.borderColor || ''
+              }
+            });  
+          }
+        }    
+
+          
+          
+        var ctx = self.Canvas.getCanvasContext();
+        
+        styledObjects.forEach(function (item) {
+          self.Renderer.renderObject(ctx,item);  
+        });
+        
+     };
+      
+    </script>
+    <script id="main-script-loader">
+    
+      window.onload = function (e) {
+        if (typeof program === 'object') {
+          program.main();
+        }
+      };
+      
+    </script>
+  </body>
+</html>
