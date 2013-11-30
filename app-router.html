@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>app-router</title>
+    <style>
+      header {
+        text-align: center;  
+      }
+      nav {
+        text-align: center;
+      }
+      
+      #menu {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      #menu li {
+        display: inline-block;
+      }
+      #menu li a {
+        padding: 0.15em 0.25em;
+        
+        text-decoration: none;
+      }
+      #menu li a:hover {
+        text-decoration: underline;
+      }
+      #display {
+        font-family: monospace;
+        font-size: 30pt;
+      }    
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <header>
+        <h1>app-router</h1>
+      </header>
+      <nav>
+        <ul id="menu">
+          <li><a href="#main">main</a></li>
+          <li><a href="#links">links</a></li>
+          <li><a href="#pics">pics</a></li>
+          <li><a href="#code">code</a></li>
+          <li><a href="#about">about</a></li>
+        </ul>
+      </nav>
+      <div id="display"></div>
+    </div>
+  <script>
+    App = {};
+    document.onreadystatechange = function (event) {
+      if (document.readyState === 'complete') {
+        App.router = {
+          routes: {
+            "/": "main",
+            "#main": "main",
+            "#links": "links",
+            "#pics": "pics",
+            "#code": "code",
+            "#about": "about"
+          },
+          handle: function (hash) {
+            var self,hash,route;
+            
+            self = this;
+            hash = hash;
+            route = self.routes[hash];
+            
+            if (route) {
+              if (typeof self[route] === 'function') {
+                self[route].call(self);
+              }
+            } else {
+              self.error();
+            }
+          },
+          init: function () {
+            var self = this;
+            window.addEventListener('hashchange',
+                                    function (event) {
+                                      self.handle.call(self,window.location.hash);
+                                    }, false);
+            window.addEventListener('beforeunload',
+                                    function (event) {
+                                      return "Please do not refresh the page";
+                                    }, false);
+            window.addEventListener('load',
+                                    function (event) {
+                                      self.handle.call(self,window.location.hash || "/" );
+                                    }, false);
+          },
+          main:  function () { App.el.innerHTML = "Main"; },
+          links: function () { App.el.innerHTML = "Links"; },
+          pics:  function () { App.el.innerHTML = "Pics"; },
+          code:  function () { App.el.innerHTML = "Code"; },
+          about: function () { App.el.innerHTML = "About"; },
+          error: function () { App.el.innerHTML = "404 - Not Found";}
+       };
+       App.el = document.getElementById('display');
+       App.router.init();
+      } 
+    };
+  </script>
+  </body>
+</html>
