@@ -1,0 +1,300 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>app-workers</title>
+    <style>
+      header {
+        text-align: center;  
+      }
+      nav {
+        text-align: center;
+      }
+      
+      #menu {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      #menu li {
+        display: inline-block;
+      }
+      #menu li a {
+        padding: 0.15em 0.25em;
+        
+        text-decoration: none;
+      }
+      #menu li a:hover {
+        text-decoration: underline;
+      }
+      
+      .datetime span {
+          margin: 0;
+          padding: 0;
+      }
+      .datetime {
+          display: block;
+          border: 1px solid gray;
+          font-family: monospace;
+          font-size: 14pt;
+          padding: 0.33em;
+          text-align: center;
+      }
+      span.time {
+          margin: 0 0.5em;
+      }
+      .time span:nth-child(1)::after,.time span:nth-child(2)::after {
+          content: ':';
+          color: black;
+      }
+      .date {
+          color: teal;
+      }
+      .date span:nth-child(1)::after,.date span:nth-child(2)::after {
+          content: '/';
+          color: black;
+      }
+      .hour {
+          color: red;
+      }
+      .min {
+          color: blue;
+      }
+      .sec {
+          color: green;
+      }
+      
+      
+      
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <header>
+        <h1>app-workers</h1>
+      </header>
+      <nav>
+        <ul id="menu">
+          <li><button id="button-timer">Timer</button></li>
+          <li><button id="button-html">Html</button></li>
+          <li><button id="button-json">JSON</button></li>
+        </ul>
+      </nav>
+      <div id="display"></div>
+    </div>
+    
+  <script id="tmpl-datetime" type="text/template">
+    <span class="datetime">
+        <span class="time">
+            <span class="hour">%hour%</span>
+            <span class="min">%min%</span>
+            <span class="sec">%sec%</span>
+        </span>
+        <span class="date">
+            <span class="month">%month%</span>
+            <span class="day">%day%</span>
+            <span class="year">%year%</span>
+        </span>
+    </span>  
+  </script>
+  <script id="worker-clock" type="text/workerjs">
+  var timerID = -1,
+      timerActive = false,
+      interval = 1000,
+      postType = 'html';
+      
+  
+  function template (templateString,templateData,prefix,suffix) {
+    var t = templateString.substr();
+    for (var token in templateData) {
+        var reg = new RegExp((prefix||'')+token+(suffix||''),"gm");
+        t = t.replace(reg,templateData[token]);
+    }
+    return t;
+  }
+  
+  function start (args) {
+      interval = args || interval;
+      timerID = setInterval(onTimer,interval);
+      timerActive = true;
+  }
+  
+  function stop () {
+      timerActive = false;
+      clearInterval(timerID);
+  }
+  
+ 
+  function toggle () {
+      if (timerActive) {
+          stop();
+      } else {
+          start(interval);
+      } 
+  }
+ 
+  function parseDate(date) {
+     var dateStr = date.toISOString(),
+         parsed;
+         
+     parsed = dateStr.split(/[T|.]/);
+     //["2013-12-01", "17:56:18", "080Z"]
+     parsed[0] = parsed[0].split('-');
+     parsed[1] = parsed[1].split(':');
+     parsed[2] = parsed[2].replace('Z','');
+     
+     return {
+         year: parsed[0][0],
+         month: parsed[0][1],
+         day: parsed [0][2],
+         hour: parsed[1][0],
+         min: parsed[1][1],
+         sec: parsed[1][2],
+         zone: 'Z',
+         offset: parsed[3]
+     };
+  }
+ 
+  function buildHtml (dateObj) {
+     var html,
+         tmpl;
+         
+     tmpl = '<span class="datetime">'
+            +'<span class="time">'
+            +'<span class="hour">%hour%</span>'
+            +'<span class="min">%min%</span>'
+            +'<span class="sec">%sec%</span>'
+            +'</span>'
+            +'<span class="date">'
+            +'<span class="month">%month%</span>'
+            +'<span class="day">%day%</span>'
+            +'<span class="year">%year%</span>'
+            +'</span>'
+            +'</span>';
+     
+     return template(tmpl,dateObj,'%','%'); 
+  }
+  
+  function postTime () {
+     var dateObj = parseDate(new Date);
+     switch (postType) {
+         case "html":
+            postMessage(buildHtml(dateObj));
+            break;
+         case "json":
+            postMessage(dateObj);
+            break;
+         default:
+            break;
+     }
+     delete dateObj;
+  } 
+  
+  function onTimer (event) {
+     postTime();
+  }
+  
+  function setPostType (type) {
+    postType = (type === 'json' || type === 'html') ? type : "html";
+  }
+  
+  function handleMessageData (data) {
+    switch (data.op) {
+      case "toggle":
+        toggle();
+        break;
+      case "start":
+        start(data.args);
+        break;
+      case "stop":
+        stop();
+        break;
+      case "posttype":
+        setPostType(data.args);
+        break;
+      default:
+        break;
+    }  
+  }
+  self.addEventListener('message',function (event) {
+    handleMessageData(event.data);
+  },false);
+  
+  // This script is pretty verbose for an example but I wanted to 
+  // show some actual work getting done in the worker.
+  </script>
+  <script>
+    // All of this code seems a bit long but I am trying to get 
+    // it all in a single file. The worker parses the date and 
+    // returns a templated html result. It would also be fine to 
+    // have the worker post the json and work with the <script> tag
+    // template. I guess it really depends on what your need to using
+    // workers is.
+    
+    // The global App object;
+    App = {};
+    App.template  = function (templateString,templateData,prefix,suffix) {
+        var t = templateString.substr();
+        for (var token in templateData) {
+            var reg = new RegExp((prefix||'')+token+(suffix||''),"gm");
+            t = t.replace(reg,templateData[token]);
+        }
+        return t;
+      }
+    // I prefer onreadystatechange
+    document.onreadystatechange = function (event) {
+      if (document.readyState === 'complete') {
+      
+        
+      App.workers = {
+        onmessage: function (event) {
+          // there probably is a better way then testing the type
+          // of the event.data, like making the data always a json
+          // object with the data type specified but that is not the
+          // way I do it here. This is all for example anyhow.
+          var el = document.getElementById('display');
+          el.innerHTML = '';
+          if (typeof event.data === 'string') {
+            el.innerHTML = event.data;
+          } else if (typeof event.data === 'object') {
+            el.innerHTML = App.template(document.getElementById("tmpl-datetime").innerText,
+                                        event.data,'%','%');
+          }
+        },
+        init: function (scriptID) {
+          // here we create a Blob object out of the embeded <script> tag
+          this.workerScript = new Blob([document.getElementById(scriptID).innerText]);
+          // createObjectURL gives us a Data url that can loaded by the Worker
+          this.workerURL = window.URL.createObjectURL(this.workerScript);
+          this.worker = new Worker(this.workerURL);
+          this.worker.addEventListener('message',this.onmessage,false);
+        },
+        start: function () {
+          // It would probably be better to send all the arguments in a single
+          // object, but, here I wanted to show that you can send multiple commands
+          // to the worker.
+          // the worker also has an option to post json, here we set it to html.
+          this.worker.postMessage({op:'posttype',args:"html"});
+          this.worker.postMessage({op:'start',args:1000});
+        }        
+      }  
+      App.workers.init('worker-clock');
+      App.workers.start();  
+        
+      document.getElementById('button-timer').addEventListener('click',function (e) {
+        App.workers.worker.postMessage({op: "toggle"});
+      },false);       
+      
+      document.getElementById('button-html').addEventListener('click',function (e) {
+        App.workers.worker.postMessage({op: "posttype",args:"html"});
+      },false);       
+      
+      document.getElementById('button-json').addEventListener('click',function (e) {
+        App.workers.worker.postMessage({op: "posttype",args:"json"});
+      },false);
+      
+      }
+    };
+  </script>
+  </body>
+</html>
