@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>app-config-loading</title>
+    <style>
+         
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <header>
+        <h1>app-config-loading</h1>
+      </header>
+      <nav></nav>
+      <div id="display"></div>
+    </div>
+    <script id="app-config" type="text/JSON">
+    {
+      "name": "App",
+      "version": "1.2.3",
+      "router": {
+        "ajax_url": "http://localhost",
+        "routes": [
+            { "route": "/", "endpoint": "main" },
+            { "route": "#main", "endpoint": "main" },
+            { "route": "#links", "endpoint": "links" },
+            { "route": "#pics", "endpoint": "pics" },
+            { "route": "#code", "endpoint": "code" },
+            { "route": "#about", "endpoint": "about" }]
+      }
+    }   
+    </script>
+    
+  <script>
+    App = {
+      init: function () {
+        var self = this;
+        console.log(self.config);
+      }
+    };
+    document.onreadystatechange = function (event) {
+      if (document.readyState === 'complete') {
+        var configEl = document.getElementById('app-config');
+        try {
+          App.config = JSON.parse(configEl.innerText);
+          App.init();
+        } catch (err) {
+          throw Error("Error loading config: ",err);
+        }
+      }
+    };
+  </script>
+  </body>
+</html>
